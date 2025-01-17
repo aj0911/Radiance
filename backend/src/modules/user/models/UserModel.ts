@@ -1,6 +1,7 @@
-import mongoose, { Schema, Model, Document } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 import User from "../../../types/User";
 import validator from "validator";
+import bcrypt from "bcryptjs";
 
 // Define the user schema
 const userSchema: Schema = new Schema(
@@ -14,6 +15,15 @@ const userSchema: Schema = new Schema(
     password_hash: {
       type: String,
       required: [true, "Password is mandatory."],
+      validate: {
+        validator: function (password: string): boolean {
+          const strongPasswordRegex: RegExp =
+            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,30}$/;
+          return strongPasswordRegex.test(password);
+        },
+        message:
+          "Password must be 8-30 characters long, include at least one uppercase letter, one lowercase letter, one number, and one special character.",
+      },
     },
     profile_image: {
       type: String,
@@ -29,7 +39,6 @@ const userSchema: Schema = new Schema(
         validator.isAlphanumeric,
         "Only Letters and Numbers is allowed in username.",
       ],
-      default:`default${Date.now()}`
     },
     dob: {
       type: Date,
@@ -51,20 +60,28 @@ const userSchema: Schema = new Schema(
     },
     is_private: {
       type: Boolean,
-      default:false
+      default: false,
     },
     is_remember: {
       type: Boolean,
-      default:false
+      default: false,
     },
     is_verified: {
       type: Boolean,
-      default:false
+      default: false,
     },
   },
   {
     timestamps: true,
   }
 );
+
+userSchema.pre<User & Document>("save", async function (next) {
+  if (!this.isModified("password_hash")) {
+    next();
+  }
+  this.password_hash = await bcrypt.hash(this.password_hash, 10);
+  next();
+});
 
 export default mongoose.model<User>("User", userSchema);
